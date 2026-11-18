@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ローカル ストーリーAI</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>ローカル ストーリーAI</h1>
+    <div class="status">
+      <span id="statusDot" class="dot idle"></span>
+      <span id="statusText">停止中</span>
+      <span id="countdown"></span>
+    </div>
+    <div class="controls">
+      <button id="startBtn" class="primary">▶ 開始</button>
+      <button id="stopBtn" disabled>■ 停止</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- 左：設定 -->
+    <aside class="panel">
+      <details open>
+        <summary>AI接続設定</summary>
+        <label>APIのURL（OpenAI互換）
+          <select id="preset">
+            <option value="http://127.0.0.1:1234/v1">LM Studio (1234)</option>
+            <option value="http://127.0.0.1:11434/v1">Ollama (11434)</option>
+            <option value="http://127.0.0.1:8080/v1">llama.cpp server (8080)</option>
+            <option value="http://127.0.0.1:8000/v1">vLLM (8000)</option>
+            <option value="custom">カスタム</option>
+          </select>
+        </label>
+        <input id="baseUrl" type="text" />
+        <label>モデル名
+          <div class="row">
+            <input id="model" type="text" list="modelList" placeholder="例: minimax-h3" />
+            <button id="loadModels" title="モデル一覧を取得">取得</button>
+          </div>
+          <datalist id="modelList"></datalist>
+        </label>
+        <label>APIキー（不要なら空欄）<input id="apiKey" type="password" /></label>
+        <div class="row">
+          <label>温度 <input id="temperature" type="number" step="0.05" min="0" max="2" value="0.8" /></label>
+          <label>最大トークン <input id="maxTokens" type="number" step="50" min="100" value="1200" /></label>
+        </div>
+        <label class="check"><input id="mock" type="checkbox" /> テストモード（AIなしで動作確認）</label>
+      </details>
+
+      <details open>
+        <summary>物語の設定（毎回AIに渡されます）</summary>
+        <label>タイトル<input id="title" type="text" placeholder="例: 霧の街の地図" /></label>
+        <label>ジャンル・文体<input id="genre" type="text" placeholder="例: ファンタジー / 三人称 / 落ち着いた文体" /></label>
+        <label>世界観<textarea id="world" rows="3" placeholder="舞台、時代、ルールなど"></textarea></label>
+        <label>登場人物<textarea id="characters" rows="4" placeholder="名前：性格・口調・関係"></textarea></label>
+      </details>
+
+      <details open>
+        <summary>進行ルール</summary>
+        <div class="row">
+          <label>間隔(秒) <input id="interval" type="number" min="1" value="5" /></label>
+          <label>1回の文字数 <input id="segLen" type="number" step="50" min="50" value="300" /></label>
+        </div>
+        <label class="check"><input id="autoContinue" type="checkbox" checked /> プロンプトが無い時も自動で続きを書く</label>
+        <label>要約の更新間隔（段落ごと）<input id="summaryEvery" type="number" min="2" value="4" /></label>
+        <label>そのまま渡す直近の段落数<input id="recentCount" type="number" min="1" value="3" /></label>
+      </details>
+
+      <details open>
+        <summary>🎬 動画設定</summary>
+        <label>映像の作り方
+          <select id="videoMode">
+            <option value="comfy">ComfyUI でAI動画クリップを生成</option>
+            <option value="none">AIなし（背景＋字幕＋ナレーション）</option>
+          </select>
+        </label>
+        <label>ComfyUI のURL<input id="comfyUrl" type="text" value="http://127.0.0.1:8188" /></label>
+        <div class="muted" style="margin-top:8px">ワークフロー（ComfyUIで「Export (API)」したJSON）</div>
+        <div class="row">
+          <span id="workflowName" class="muted">未設定</span>
+          <label class="filebtn">読込<input id="workflowFile" type="file" accept=".json" hidden /></label>
+        </div>
+        <label>映像スタイル・キャラクターの外見（英語推奨）
+          <textarea id="visualStyle" rows="3" placeholder="例: anime style, soft light. Mio: 16yo girl, short black hair, red scarf"></textarea>
+        </label>
+        <label>ネガティブプロンプト<input id="negative" type="text" value="blurry, low quality, distorted, text, watermark" /></label>
+        <label class="check"><input id="autoVideo" type="checkbox" /> 段落ができたら自動でクリップを作る</label>
+        <label class="check"><input id="narration" type="checkbox" checked /> ナレーション（Windows音声）</label>
+        <label>読み上げ速度 <input id="ttsRate" type="number" min="-10" max="10" value="1" /></label>
+        <label class="check"><input id="subtitles" type="checkbox" checked /> 字幕を入れる</label>
+        <label>サイズ
+          <select id="videoSize">
+            <option value="1280x720">1280×720（横）</option>
+            <option value="720x1280">720×1280（縦・ショート）</option>
+            <option value="1920x1080">1920×1080（フルHD）</option>
+          </select>
+        </label>
+        <button id="clipAllBtn">未作成の素材をまとめて作成</button>
+        <button id="renderBtn" class="primary">🎬 動画を書き出す（MP4）</button>
+        <div id="videoStatus" class="muted"></div>
+      </details>
+
+      <details open>
+        <summary>🥋 動画→動画（動きを正確に再現）</summary>
+        <div class="muted" style="margin-top:6px">参照動画の「動き」をそのまま使い、見た目だけAIで作り変えます。</div>
+        <div class="row" style="margin-top:8px">
+          <span id="refName" class="muted">参照動画：未選択</span>
+          <label class="filebtn">動画を選ぶ<input id="refFile" type="file" accept="video/*" hidden /></label>
+        </div>
+        <video id="refPreview" class="ref-preview" controls muted hidden></video>
+        <div class="row">
+          <label>開始(秒) <input id="v2vStart" type="number" min="0" step="0.1" value="0" /></label>
+          <label>終了(秒) <input id="v2vEnd" type="number" min="0" step="0.1" placeholder="最後まで" /></label>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <button id="setStartBtn" title="プレビューの現在位置を開始に">▶ 今の位置を開始に</button>
+          <button id="setEndBtn" title="プレビューの現在位置を終了に">今の位置を終了に ■</button>
+        </div>
+        <div class="row wrap" style="margin-top:8px">
+          <span class="muted">プリセット：</span>
+          <button id="presetKendo">🥋 剣道</button>
+          <button id="presetClear">クリア</button>
+        </div>
+        <label>見た目の指示（何に作り変えるか）
+          <textarea id="v2vPrompt" rows="4" placeholder="例: 木の道場で防具を着けた剣士が竹刀で面を打つ、アニメ調"></textarea>
+        </label>
+        <label class="check"><input id="v2vTranslate" type="checkbox" checked /> 日本語を英語に変換して渡す（文章AI）</label>
+        <label>ネガティブ（崩れ防止）<textarea id="v2vNegative" rows="2"></textarea></label>
+        <div class="muted" style="margin-top:8px">ワークフロー（制御付き：Wan VACE＋DWPose など）</div>
+        <div class="row">
+          <span id="v2vWorkflowName" class="muted">未設定</span>
+          <label class="filebtn">読込<input id="v2vWorkflowFile" type="file" accept=".json" hidden /></label>
+        </div>
+        <label>出力サイズ
+          <select id="v2vSize">
+            <option value="auto">参照動画に合わせる（832×480 / 480×832）</option>
+            <option value="832x480">832×480（横）</option>
+            <option value="480x832">480×832（縦）</option>
+            <option value="640x640">640×640（正方形）</option>
+            <option value="1280x720">1280×720（VRAM 12GB以上推奨）</option>
+          </select>
+        </label>
+        <div class="row">
+          <label>fps <input id="v2vFps" type="number" min="8" max="30" value="16" /></label>
+          <label>分割(秒) <input id="v2vChunk" type="number" min="1" max="10" step="0.5" value="5" /></label>
+        </div>
+        <div class="row">
+          <label>動きへの忠実さ <input id="v2vStrength" type="number" min="0" max="2" step="0.05" value="1.0" /></label>
+          <label>シード <input id="v2vSeed" type="number" placeholder="空=ランダム" /></label>
+        </div>
+        <label class="check"><input id="v2vAudio" type="checkbox" checked /> 元の音声を残す（気合・打突音）</label>
+        <label class="check"><input id="v2vCompare" type="checkbox" checked /> 元動画と並べた比較動画も作る</label>
+        <button id="v2vRunBtn" class="primary wide">🥋 動画→動画 変換開始</button>
+        <div id="v2vStatus" class="muted"></div>
+      </details>
+
+      <details open>
+        <summary>⏱ 5秒ごとのプロンプト（最大30秒）</summary>
+        <div class="muted" style="margin-top:6px">
+          5秒ごとに何が起きるかを入力 → 1本の動画にします。<br />
+          参照動画があれば<b>その動き</b>を使い（動画→動画）、無ければ文章から生成します。<br />
+          空欄のコマは直前のプロンプトを引き継ぎ、最後に入力したコマで終わります。
+        </div>
+        <div id="timeline" class="timeline"></div>
+        <div id="timelineTotal" class="muted"></div>
+        <div class="row wrap" style="margin-top:6px">
+          <button id="tlKendo">🥋 剣道の例を入れる</button>
+          <button id="tlClear">全部消す</button>
+        </div>
+        <label class="check"><input id="tlUseRef" type="checkbox" checked /> 参照動画があればその動きを使う</label>
+        <div class="muted">共通の見た目は「🥋 動画→動画」の「見た目の指示」、ネガティブ・強さ・シードも同じ設定を使います。</div>
+        <button id="tlRunBtn" class="primary wide">⏱ 30秒タイムライン動画を作る</button>
+        <div id="tlStatus" class="muted"></div>
+      </details>
+
+      <details>
+        <summary>これまでのあらすじ（自動更新・編集可）</summary>
+        <textarea id="summary" rows="8"></textarea>
+      </details>
+
+      <div class="row wrap">
+        <button id="exportTxt">TXT保存</button>
+        <button id="exportJson">JSON保存</button>
+        <label class="filebtn">JSON読込<input id="importJson" type="file" accept=".json" hidden /></label>
+        <button id="clearBtn" class="danger">全消去</button>
+      </div>
+    </aside>
+
+    <!-- 右：物語 -->
+    <section class="story-wrap">
+      <div id="story" class="story"></div>
+
+      <div id="videoResult" class="video-result" hidden>
+        <video id="finalVideo" controls></video>
+        <video id="compareVideo" controls hidden></video>
+        <div class="links">
+          <span id="resultTitle" class="muted"></span>
+          <a id="finalLink" download>MP4をダウンロード</a>
+          <a id="compareLink" download hidden>比較動画をダウンロード</a>
+        </div>
+        <button id="closeVideo">閉じる</button>
+      </div>
+
+      <div class="queue">
+        <div class="queue-head">待機中のプロンプト <span id="queueCount">0</span></div>
+        <ol id="queueList"></ol>
+      </div>
+
+      <form id="promptForm" class="prompt-bar">
+        <input id="promptInput" type="text" autocomplete="off"
+          placeholder="次の展開を入力して Enter（例: 主人公が古い鍵を見つける）" />
+        <button type="submit" class="primary">追加</button>
+      </form>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

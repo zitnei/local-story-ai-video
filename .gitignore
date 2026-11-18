@@ -1,0 +1,12 @@
+# 生成物（動画・音声・参照動画・作業ファイル）
+output/
+
+# 依存・ログ
+node_modules/
+*.log
+
+# エディタ・ツール設定
+.claude/
+.vscode/
+.DS_Store
+Thumbs.db
