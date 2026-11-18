@@ -475,6 +475,7 @@ async function videoWorker() {
           const r = await postJob("/api/video/clip", {
             mock: s.mock, comfyUrl: s.comfyUrl, workflow: wf?.json,
             prompt: seg.scenePrompt, negative: s.negative, segId: seg.id,
+            ...clipSize(s),
           });
           seg.clip = r.url;
           save();
@@ -589,6 +590,11 @@ function v2vParams(s) {
     width: w, height: h, fps: Number(s.v2vFps), chunkSec: Number(s.v2vChunk),
     strength: s.v2vStrength, seed: s.v2vSeed, negative: s.v2vNegative,
   };
+}
+// 物語クリップの生成サイズ（8GB GPU 向けに 480p 級。書き出し時に拡大・切り抜き）
+function clipSize(s) {
+  const [w, h] = String(s.videoSize || "1280x720").split("x").map(Number);
+  return w >= h ? { width: 832, height: 480 } : { width: 480, height: 832 };
 }
 function loadJsonKey(k) {
   try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (_) { return null; }
@@ -929,6 +935,46 @@ function showV2VWorkflowName() {
 }
 $("v2vRunBtn").onclick = runV2VPanel;
 
+// 標準ワークフロー（workflows/ フォルダ）を読み込む
+async function usePreset(id, key, quiet) {
+  const r = await fetch("/api/comfy/preset?id=" + encodeURIComponent(id));
+  const p = await r.json();
+  if (!r.ok) throw new Error(p.error || r.status);
+  localStorage.setItem(key, JSON.stringify({ name: p.name, json: p.json, preset: p.id }));
+  showWorkflowName();
+  showV2VWorkflowName();
+  if (!quiet) $("comfyCheck").textContent = `「${p.name}」を設定しました。`;
+}
+const presetBtn = (btn, id, key) => ($(btn).onclick = () => usePreset(id, key).catch((e) => alert("読込失敗: " + e.message)));
+presetBtn("wfPresetT2v", "wan_vace_t2v", WORKFLOW_KEY);
+presetBtn("wfPresetPose", "wan_vace_v2v_pose", V2V_WORKFLOW_KEY);
+presetBtn("wfPresetPoseDepth", "wan_vace_v2v_pose_depth", V2V_WORKFLOW_KEY);
+
+// ComfyUI 接続チェック：GPU・ノード・モデルファイル
+$("comfyCheckBtn").onclick = async () => {
+  const box = $("comfyCheck");
+  const s = readSettings();
+  box.textContent = "確認中…";
+  const workflows = [
+    { label: "文章→動画", json: loadWorkflow()?.json },
+    { label: "動画→動画", json: loadJsonKey(V2V_WORKFLOW_KEY)?.json },
+  ].filter((w) => w.json);
+  try {
+    const r = await fetch("/api/comfy/check", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ comfyUrl: s.comfyUrl, workflows }),
+    });
+    const j = await r.json();
+    box.innerHTML = "";
+    const line = (text, cls) => { const d = document.createElement("div"); d.textContent = text; if (cls) d.className = cls; box.appendChild(d); };
+    if (j.gpu) line(`GPU：${j.gpu.name}${j.gpu.vramGB ? `（${j.gpu.vramGB}GB、空き ${j.gpu.freeGB}GB）` : ""}`);
+    line(j.ok ? "✅ 準備OK：動画を生成できます" : "⚠ 次の点を直してください", j.ok ? "ok" : "ng");
+    j.problems.forEach((p) => line("・" + p, "ng"));
+    j.notes.forEach((p) => line("・" + p));
+    if (!workflows.length) line("・ワークフローが未設定です。「標準を使う」を押してください。", "ng");
+  } catch (e) { box.textContent = "確認に失敗しました: " + e.message; }
+};
+
 // タイムライン
 $("tlRunBtn").onclick = runTimeline;
 $("tlKendo").onclick = () => {
@@ -958,6 +1004,9 @@ const match = [...$("preset").options].find((o) => o.value === $("baseUrl").valu
 $("preset").value = match ? match.value : "custom";
 showWorkflowName();
 showV2VWorkflowName();
+// ワークフローが未設定なら、PCに入れたモデル用の標準ワークフローを自動で設定
+if (!loadWorkflow()) usePreset("wan_vace_t2v", WORKFLOW_KEY, true).catch(() => {});
+if (!loadJsonKey(V2V_WORKFLOW_KEY)) usePreset("wan_vace_v2v_pose_depth", V2V_WORKFLOW_KEY, true).catch(() => {});
 showRef();
 updateTimelineTotal();
 if (!$("v2vNegative").value) $("v2vNegative").value = KENDO_PRESET.negative;

@@ -13,6 +13,7 @@ const HOST = "127.0.0.1"; // 自分のPCからのみアクセス可
 const PUBLIC_DIR = path.join(__dirname, "public");
 const video = require("./video");
 const v2v = require("./v2v");
+const comfy = require("./comfy");
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -160,6 +161,9 @@ http
     try {
       if (req.method === "POST" && url.pathname === "/api/chat") return await handleChat(req, res);
       if (req.method === "GET" && url.pathname === "/api/models") return await handleModels(req, res, url);
+      if (url.pathname.startsWith("/api/comfy/")) {
+        if ((await comfy.handle(req, res, url, readBody, sendJson)) !== false) return;
+      }
       if (url.pathname.startsWith("/api/v2v/")) {
         if ((await v2v.handle(req, res, url, readBody, sendJson)) !== false) return;
       }

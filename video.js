@@ -84,8 +84,20 @@ function prepareWorkflow(workflow, prompt, negative) {
 
 const comfyBase = (u) => String(u || "http://127.0.0.1:8188").replace(/\/+$/, "");
 
-async function comfyClip({ comfyUrl, workflow, prompt, negative, segId }, progress) {
-  const wf = prepareWorkflow(workflow, prompt, negative);
+// 生成サイズ（縦・横）をワークフローに当てはめる
+function applySize(wf, width, height) {
+  if (!width || !height) return wf;
+  for (const n of Object.values(wf)) {
+    const inp = n?.inputs;
+    if (!inp || !/ToVideo|Vace|EmptyHunyuanLatentVideo|EmptyLTXV|EmptyMochi|EmptyCosmos/i.test(String(n.class_type || ""))) continue;
+    if (typeof inp.width === "number") inp.width = width;
+    if (typeof inp.height === "number") inp.height = height;
+  }
+  return wf;
+}
+
+async function comfyClip({ comfyUrl, workflow, prompt, negative, segId, width, height }, progress) {
+  const wf = applySize(prepareWorkflow(workflow, prompt, negative), Number(width) || 0, Number(height) || 0);
   const dest = await comfyRun(comfyBase(comfyUrl), wf, `${safeId(segId)}_${Date.now()}`, DIRS.clips, progress);
   return { url: toUrl(dest) };
 }

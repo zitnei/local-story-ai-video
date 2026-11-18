@@ -103,3 +103,7 @@ button.wide, #v2vRunBtn { width: 100%; margin-top: 10px; }
   main { grid-template-columns: 1fr; }
   .panel { max-height: 40vh; border-right: 0; border-bottom: 1px solid var(--line); }
 }
+.check-result { margin-top: 6px; line-height: 1.6; }
+.check-result .ok { color: #3fb950; font-weight: bold; }
+.check-result .ng { color: #f0883e; }
+.wf-name { margin: 2px 0 4px; font-weight: bold; }

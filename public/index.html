@@ -79,10 +79,13 @@
         </label>
         <label>ComfyUI のURL<input id="comfyUrl" type="text" value="http://127.0.0.1:8188" /></label>
         <div class="muted" style="margin-top:8px">ワークフロー（ComfyUIで「Export (API)」したJSON）</div>
+        <div id="workflowName" class="wf-name">未設定</div>
         <div class="row">
-          <span id="workflowName" class="muted">未設定</span>
           <label class="filebtn">読込<input id="workflowFile" type="file" accept=".json" hidden /></label>
+          <button id="wfPresetT2v" title="PCに入れた Wan 2.1 VACE 1.3B 用の標準ワークフロー">標準を使う</button>
         </div>
+        <button id="comfyCheckBtn">🔌 ComfyUI 接続チェック</button>
+        <div id="comfyCheck" class="check-result muted"></div>
         <label>映像スタイル・キャラクターの外見（英語推奨）
           <textarea id="visualStyle" rows="3" placeholder="例: anime style, soft light. Mio: 16yo girl, short black hair, red scarf"></textarea>
         </label>
@@ -130,9 +133,13 @@
         <label class="check"><input id="v2vTranslate" type="checkbox" checked /> 日本語を英語に変換して渡す（文章AI）</label>
         <label>ネガティブ（崩れ防止）<textarea id="v2vNegative" rows="2"></textarea></label>
         <div class="muted" style="margin-top:8px">ワークフロー（制御付き：Wan VACE＋DWPose など）</div>
+        <div id="v2vWorkflowName" class="wf-name">未設定</div>
         <div class="row">
-          <span id="v2vWorkflowName" class="muted">未設定</span>
           <label class="filebtn">読込<input id="v2vWorkflowFile" type="file" accept=".json" hidden /></label>
+        </div>
+        <div class="row wrap">
+          <button id="wfPresetPose" title="骨格（DWPose）だけで動きを固定">標準：骨格のみ</button>
+          <button id="wfPresetPoseDepth" title="骨格＋深度。竹刀など細い物の位置が安定">標準：骨格＋深度（剣道）</button>
         </div>
         <label>出力サイズ
           <select id="v2vSize">
