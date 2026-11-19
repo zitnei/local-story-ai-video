@@ -551,11 +551,11 @@ const KENDO_PRESET = {
   prompt:
     "kendo practitioner in a traditional wooden dojo, wearing full bogu armor: men helmet with metal face grille and blue cloth, " +
     "kote padded gloves on both hands, black lacquered do chest protector, tare waist guard, dark indigo keikogi jacket and wide hakama, " +
-    "holding one straight bamboo shinai with both hands, correct grip with left hand at the end of the tsuka, sharp precise strikes, " +
+    "holding one straight pale wooden-colored kendo sword (shinai) with both hands, correct grip with left hand at the end of the leather tsuka, sharp precise strikes, " +
     "realistic, natural lighting, high detail, stable camera",
   negative:
     "extra limbs, extra arms, extra hands, missing hands, fused fingers, deformed body, twisted torso, " +
-    "bent shinai, broken shinai, two swords, metal katana, sword through body, floating sword, " +
+    "bent shinai, broken shinai, green bamboo plant, leaves, two swords, metal katana, sword through body, floating sword, " +
     "distorted face, morphing, flickering, jitter, blurry, low quality, text, watermark",
 };
 

@@ -138,7 +138,13 @@ async function comfyRun(base, wf, name, destDir, progress) {
       continue;
     }
     const isVideo = (f) => /\.(mp4|webm|mov|mkv|gif|webp)$/i.test(f.filename);
-    const pick = files.filter((f) => f.type !== "temp").filter(isVideo).pop() || files.filter(isVideo).pop() || files.pop();
+    // 生成結果（type=output）を優先。LoadVideo などは入力ファイル（type=input）も出力一覧に載せるため除外する
+    const outs = files.filter((f) => (f.type || "output") === "output");
+    if (!outs.length) {
+      if (entry.status?.completed) throw new Error("ComfyUI の生成結果（output）が見つかりません（保存ノードがありますか？）");
+      continue;
+    }
+    const pick = outs.filter(isVideo).pop() || outs.pop();
     progress("クリップを保存中");
     const q = new URLSearchParams({ filename: pick.filename, subfolder: pick.subfolder || "", type: pick.type || "output" });
     const fr = await fetch(`${base}/view?${q}`);
